@@ -1,8 +1,14 @@
 package com.ryanheise.just_audio;
 
+import android.Manifest;
+import android.app.Activity;
 import android.content.Context;
+import android.content.pm.PackageManager;
+import android.media.audiofx.Visualizer;
 import android.net.Uri;
 import android.os.Handler;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import com.google.android.exoplayer2.C;
 import com.google.android.exoplayer2.ExoPlaybackException;
 import com.google.android.exoplayer2.MediaItem;
@@ -35,13 +41,13 @@ import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import io.flutter.Log;
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding;
 import io.flutter.plugin.common.BinaryMessenger;
-import io.flutter.plugin.common.EventChannel;
-import io.flutter.plugin.common.EventChannel.EventSink;
 import io.flutter.plugin.common.MethodCall;
 import io.flutter.plugin.common.MethodChannel;
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler;
 import io.flutter.plugin.common.MethodChannel.Result;
+import io.flutter.plugin.common.PluginRegistry;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -50,7 +56,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 
-public class AudioPlayer implements MethodCallHandler, Player.EventListener, AudioListener, MetadataOutput {
+public class AudioPlayer implements MethodCallHandler, Player.EventListener, AudioListener, MetadataOutput, PluginRegistry.RequestPermissionsResultListener {
 
     static final String TAG = "AudioPlayer";
 
@@ -58,8 +64,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private final Context context;
     private final MethodChannel methodChannel;
-    private final EventChannel eventChannel;
-    private EventSink eventSink;
+    private final BetterEventChannel eventChannel;
+    private ActivityPluginBinding activityPluginBinding;
 
     private ProcessingState processingState;
     private long bufferedPosition;
@@ -77,6 +83,12 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private IcyHeaders icyHeaders;
     private int errorCount;
     private AudioAttributes pendingAudioAttributes;
+    private BetterVisualizer visualizer;
+    private Result startVisualizerResult;
+    private boolean enableWaveform;
+    private boolean enableFft;
+    private Integer visualizerCaptureRate;
+    private Integer visualizerCaptureSize;
 
     private SimpleExoPlayer player;
     private Integer audioSessionId;
@@ -114,24 +126,50 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         this.context = applicationContext;
         methodChannel = new MethodChannel(messenger, "com.ryanheise.just_audio.methods." + id);
         methodChannel.setMethodCallHandler(this);
-        eventChannel = new EventChannel(messenger, "com.ryanheise.just_audio.events." + id);
-        eventChannel.setStreamHandler(new EventChannel.StreamHandler() {
-            @Override
-            public void onListen(final Object arguments, final EventSink eventSink) {
-                AudioPlayer.this.eventSink = eventSink;
-            }
-
-            @Override
-            public void onCancel(final Object arguments) {
-                eventSink = null;
-            }
-        });
+        eventChannel = new BetterEventChannel(messenger, "com.ryanheise.just_audio.events." + id);
+        visualizer = new BetterVisualizer(messenger, id);
         processingState = ProcessingState.none;
+    }
+
+    private void requestPermissions() {
+        ActivityCompat.requestPermissions(activityPluginBinding.getActivity(), new String[] { Manifest.permission.RECORD_AUDIO }, 1);
+    }
+
+    public void setActivityPluginBinding(ActivityPluginBinding activityPluginBinding) {
+        if (this.activityPluginBinding != null && this.activityPluginBinding != activityPluginBinding) {
+            this.activityPluginBinding.removeRequestPermissionsResultListener(this);
+        }
+        this.activityPluginBinding = activityPluginBinding;
+        if (activityPluginBinding != null) {
+            activityPluginBinding.addRequestPermissionsResultListener(this);
+            // If there is a pending startVisualizer request
+            if (startVisualizerResult != null) {
+                requestPermissions();
+            }
+        }
     }
 
     private void startWatchingBuffer() {
         handler.removeCallbacks(bufferWatcher);
         handler.post(bufferWatcher);
+    }
+
+    @Override
+    public boolean onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        for (int i = 0; i < permissions.length; i++) {
+            if (permissions[i].equals(Manifest.permission.RECORD_AUDIO)) {
+                if (grantResults[i] == PackageManager.PERMISSION_GRANTED) {
+                    visualizer.setHasPermission(true);
+                    if (startVisualizerResult != null) {
+                        completeStartVisualizer(true);
+                    }
+                    return true;
+                }
+                completeStartVisualizer(false);
+                break;
+            }
+        }
+        return false;
     }
 
     @Override
@@ -141,6 +179,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         } else {
             this.audioSessionId = audioSessionId;
         }
+        visualizer.onAudioSessionId(this.audioSessionId);
+        broadcastPlaybackEvent();
     }
 
     @Override
@@ -278,12 +318,50 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         seekResult = null;
     }
 
+    private void completeStartVisualizer(boolean success) {
+        if (startVisualizerResult == null) return;
+        if (success) {
+            visualizer.start(visualizerCaptureRate, visualizerCaptureSize, enableWaveform, enableFft);
+            startVisualizerResult.success(new HashMap<String, Object>());
+        } else {
+            startVisualizerResult.error("RECORD_AUDIO permission denied", null, null);
+        }
+        startVisualizerResult = null;
+    }
+
     @Override
     public void onMethodCall(final MethodCall call, final Result result) {
         ensurePlayerInitialized();
 
         try {
             switch (call.method) {
+            case "startVisualizer":
+                Boolean enableWaveform = call.argument("enableWaveform");
+                Boolean enableFft = call.argument("enableFft");
+                Integer captureRate = call.argument("captureRate");
+                Integer captureSize = call.argument("captureSize");
+                this.enableWaveform = enableWaveform;
+                this.enableFft = enableFft;
+                visualizerCaptureRate = captureRate;
+                visualizerCaptureSize = captureSize;
+                startVisualizerResult = result;
+                if (ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                    // We have permission
+                    visualizer.setHasPermission(true);
+                    if (audioSessionId != null) {
+                        completeStartVisualizer(true);
+                    }
+                } else if (activityPluginBinding != null && activityPluginBinding.getActivity() != null) {
+                    // We are ready to request permission
+                    requestPermissions();
+                } else {
+                    // Will request permission in setActivityPluginBinding
+                }
+                break;
+            case "stopVisualizer":
+                visualizer.stop();
+                result.success(new HashMap<String, Object>());
+                break;
             case "load":
                 Long initialPosition = getLong(call.argument("initialPosition"));
                 Integer initialIndex = call.argument("initialIndex");
@@ -530,6 +608,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private void ensurePlayerInitialized() {
         if (player == null) {
             player = new SimpleExoPlayer.Builder(context).build();
+            onAudioSessionIdChanged(player.getAudioSessionId());
             player.addMetadataOutput(this);
             player.addListener(this);
             player.addAudioListener(this);
@@ -566,9 +645,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         event.put("currentIndex", currentIndex);
         event.put("androidAudioSessionId", audioSessionId);
 
-        if (eventSink != null) {
-            eventSink.success(event);
-        }
+        eventChannel.success(event);
     }
 
     private Map<String, Object> collectIcyMetadata() {
@@ -616,9 +693,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             prepareResult = null;
         }
 
-        if (eventSink != null) {
-            eventSink.error(errorCode, errorMsg, null);
-        }
+        eventChannel.error(errorCode, errorMsg, null);
     }
 
     private void transition(final ProcessingState newState) {
@@ -707,9 +782,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
             player = null;
             transition(ProcessingState.none);
         }
-        if (eventSink != null) {
-            eventSink.endOfStream();
-        }
+        eventChannel.endOfStream();
+        visualizer.dispose();
     }
 
     private void abortSeek() {
