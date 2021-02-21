@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
 import 'package:meta/meta.dart' show required;
@@ -66,6 +67,17 @@ abstract class AudioPlayerPlatform {
   Stream<PlaybackEventMessage> get playbackEventMessageStream {
     throw UnimplementedError(
         'playbackEventMessageStream has not been implemented.');
+  }
+
+  /// A stream of visualizer waveform data.
+  Stream<VisualizerWaveformCaptureMessage> get visualizerWaveformStream {
+    throw UnimplementedError(
+        'visualizerWaveformStream has not been implemented.');
+  }
+
+  /// A stream of visualizer fft data.
+  Stream<VisualizerFftCaptureMessage> get visualizerFftStream {
+    throw UnimplementedError('visualizerFftStream has not been implemented.');
   }
 
   /// Loads an audio source.
@@ -156,6 +168,17 @@ abstract class AudioPlayerPlatform {
   Future<ConcatenatingMoveResponse> concatenatingMove(
       ConcatenatingMoveRequest request) {
     throw UnimplementedError("concatenatingMove() has not been implemented.");
+  }
+
+  /// Starts the visualizer.
+  Future<StartVisualizerResponse> startVisualizer(
+      StartVisualizerRequest request) {
+    throw UnimplementedError("startVisualizer() has not been implemented.");
+  }
+
+  /// Stops the visualizer.
+  Future<StopVisualizerResponse> stopVisualizer(StopVisualizerRequest request) {
+    throw UnimplementedError("stopVisualizer() has not been implemented.");
   }
 }
 
@@ -622,6 +645,79 @@ class ConcatenatingMoveRequest {
 class ConcatenatingMoveResponse {
   static ConcatenatingMoveResponse fromMap(Map<dynamic, dynamic> map) =>
       ConcatenatingMoveResponse();
+}
+
+/// Information communicated to the platform implementation when starting the
+/// visualizer.
+class StartVisualizerRequest {
+  final bool enableWaveform;
+  final bool enableFft;
+  final int captureRate;
+  final int captureSize;
+
+  StartVisualizerRequest({
+    @required this.enableWaveform,
+    @required this.enableFft,
+    @required this.captureRate,
+    @required this.captureSize,
+  });
+
+  Map<dynamic, dynamic> toMap() => {
+        'enableWaveform': enableWaveform,
+        'enableFft': enableFft,
+        'captureRate': captureRate,
+        'captureSize': captureSize,
+      };
+}
+
+/// Information returned by the platform implementation after starting the
+/// visualizer.
+class StartVisualizerResponse {
+  StartVisualizerResponse();
+
+  static StartVisualizerResponse fromMap(Map<dynamic, dynamic> map) =>
+      StartVisualizerResponse();
+}
+
+/// Information communicated to the platform implementation when stopping the
+/// visualizer.
+class StopVisualizerRequest {
+  Map<dynamic, dynamic> toMap() => {};
+}
+
+/// Information returned by the platform implementation after stopping the
+/// visualizer.
+class StopVisualizerResponse {
+  static StopVisualizerResponse fromMap(Map<dynamic, dynamic> map) =>
+      StopVisualizerResponse();
+}
+
+/// A capture of audio waveform data.
+class VisualizerWaveformCaptureMessage {
+  /// The sampling rate of the capture.
+  final int samplingRate;
+
+  /// The waveform data.
+  final Uint8List data;
+
+  VisualizerWaveformCaptureMessage({
+    @required this.samplingRate,
+    @required this.data,
+  });
+}
+
+/// A capture of audio FFT data.
+class VisualizerFftCaptureMessage {
+  /// The sampling rate of the capture.
+  final int samplingRate;
+
+  /// The FFT data.
+  final Uint8List data;
+
+  VisualizerFftCaptureMessage({
+    @required this.samplingRate,
+    @required this.data,
+  });
 }
 
 /// Information about an audio source to be communicated with the platform
