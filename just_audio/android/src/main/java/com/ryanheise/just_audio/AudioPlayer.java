@@ -285,6 +285,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     @Override
     public void onPlayerError(ExoPlaybackException error) {
+        transition(ProcessingState.error);
         switch (error.type) {
         case ExoPlaybackException.TYPE_SOURCE:
             Log.e(TAG, "TYPE_SOURCE: " + error.getSourceException().getMessage());
@@ -816,6 +817,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         loading,
         buffering,
         ready,
-        completed
+        completed,
+        error
     }
 }
