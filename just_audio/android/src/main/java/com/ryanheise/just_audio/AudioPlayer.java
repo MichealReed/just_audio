@@ -575,9 +575,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
         String userAgent = Util.getUserAgent(context, "just_audio");
         DataSource.Factory httpDataSourceFactory = new DefaultHttpDataSourceFactory(
                 userAgent,
-                DefaultHttpDataSource.DEFAULT_CONNECT_TIMEOUT_MILLIS,
-                DefaultHttpDataSource.DEFAULT_READ_TIMEOUT_MILLIS,
-                true
+                400,
+                400,
+                false
         );
         return new DefaultDataSourceFactory(context, httpDataSourceFactory);
     }
