@@ -17,7 +17,8 @@ enum ProcessingState {
 	loading,
 	buffering,
 	ready,
-	completed
+	completed,
+	error
 };
 
 enum LoopMode {

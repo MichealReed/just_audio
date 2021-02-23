@@ -229,6 +229,7 @@ enum ProcessingStateMessage {
   buffering,
   ready,
   completed,
+  error
 }
 
 /// Icy metadata communicated from the platform implementation.
