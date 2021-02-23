@@ -38,6 +38,9 @@ import com.google.android.exoplayer2.upstream.DataSource;
 import com.google.android.exoplayer2.upstream.DefaultDataSourceFactory;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSource;
 import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
+import com.google.android.exoplayer2.ext.cronet.CronetDataSource;
+import com.google.android.exoplayer2.ext.cronet.CronetDataSourceFactory;
+import com.google.android.exoplayer2.ext.cronet.CronetEngineWrapper;
 import com.google.android.exoplayer2.util.MimeTypes;
 import com.google.android.exoplayer2.util.Util;
 import io.flutter.Log;
@@ -55,6 +58,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.Executors;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, AudioListener, MetadataOutput, PluginRegistry.RequestPermissionsResultListener {
 
@@ -573,13 +577,8 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private DataSource.Factory buildDataSourceFactory() {
         String userAgent = Util.getUserAgent(context, "just_audio");
-        DataSource.Factory httpDataSourceFactory = new DefaultHttpDataSourceFactory(
-                userAgent,
-                400,
-                400,
-                false
-        );
-        return new DefaultDataSourceFactory(context, httpDataSourceFactory);
+        CronetEngineWrapper wrapper = new CronetEngineWrapper(context, userAgent, false);
+        return new CronetDataSource.Factory(wrapper, Executors.newSingleThreadExecutor());
     }
 
     private void load(final MediaSource mediaSource, final long initialPosition, final Integer initialIndex, final Result result) {
