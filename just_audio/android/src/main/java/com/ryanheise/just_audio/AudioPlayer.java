@@ -579,7 +579,11 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
     private DataSource.Factory buildDataSourceFactory() {
         String userAgent = Util.getUserAgent(context, "just_audio");
         CronetEngine cronetEngine = new CronetEngine.Builder(context)
-            .enableQuic(true).enableBrotli(true).setUserAgent(userAgent).build();
+                .enableHttpCache(CronetEngine.Builder.HTTP_CACHE_IN_MEMORY, 100 * 1024)
+                .enableHttp2(true)
+                .enableQuic(true)
+                .addQuicHint("quic.tech", 8443, 8443)
+                .build();
         CronetEngineWrapper wrapper = new CronetEngineWrapper(cronetEngine);
         return new CronetDataSource.Factory(wrapper, Executors.newSingleThreadExecutor());
     }

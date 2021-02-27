@@ -57,6 +57,15 @@ class _MyAppState extends State<MyApp> {
             "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
       ),
     ),
+    AudioSource.uri(
+      Uri.parse("https://stream.practicalvr.com/files/live.mpd"),
+      tag: AudioMetadata(
+        album: "DASH",
+        title: "Stream",
+        artwork:
+            "https://media.wnyc.org/i/1400/1400/l/80/1/ScienceFriday_WNYCStudios_1400.jpg",
+      ),
+    ),
   ]);
   int _addedCount = 0;
 
