@@ -59,6 +59,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.concurrent.Executors;
+import org.chromium.net.CronetEngine;
 
 public class AudioPlayer implements MethodCallHandler, Player.EventListener, AudioListener, MetadataOutput, PluginRegistry.RequestPermissionsResultListener {
 
@@ -577,7 +578,9 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
 
     private DataSource.Factory buildDataSourceFactory() {
         String userAgent = Util.getUserAgent(context, "just_audio");
-        CronetEngineWrapper wrapper = new CronetEngineWrapper(context, userAgent, false);
+        CronetEngine cronetEngine = new CronetEngine.Builder(context)
+            .enableQuic(true).enableBrotli(true).setUserAgent(userAgent).build();
+        CronetEngineWrapper wrapper = new CronetEngineWrapper(cronetEngine);
         return new CronetDataSource.Factory(wrapper, Executors.newSingleThreadExecutor());
     }
 
