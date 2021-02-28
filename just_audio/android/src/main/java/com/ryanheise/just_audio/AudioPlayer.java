@@ -582,7 +582,7 @@ public class AudioPlayer implements MethodCallHandler, Player.EventListener, Aud
                 .enableHttpCache(CronetEngine.Builder.HTTP_CACHE_IN_MEMORY, 100 * 1024)
                 .enableHttp2(true)
                 .enableQuic(true)
-                .addQuicHint("quic.tech", 8443, 8443)
+                .addQuicHint("google.com", 443, 443)
                 .build();
         CronetEngineWrapper wrapper = new CronetEngineWrapper(cronetEngine);
         return new CronetDataSource.Factory(wrapper, Executors.newSingleThreadExecutor());
